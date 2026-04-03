@@ -46,8 +46,16 @@ def format_frame_name(s: float) -> str:
     return f"frame_{m:03d}m{sec:02d}s.jpg"
 
 
+def _ensure_path():
+    """Ensure homebrew tools are in PATH."""
+    homebrew = "/opt/homebrew/bin"
+    if homebrew not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = homebrew + os.pathsep + os.environ.get("PATH", "")
+
+
 def run_cmd(cmd, desc="", timeout=600):
     """Run a shell command and return stdout. Raises on failure."""
+    _ensure_path()
     if desc:
         print(f"  {desc}...")
     result = subprocess.run(
@@ -550,7 +558,7 @@ def main():
     p_analyze.add_argument("--whisper-model", default="base", choices=["tiny", "base", "small", "medium", "large"])
     p_analyze.add_argument("--force-whisper", action="store_true", help="Skip YouTube subs, use Whisper")
     p_analyze.add_argument("--frame-interval", type=int, default=30, help="Seconds between frames (default: 30)")
-    p_analyze.add_argument("--max-frames", type=int, default=60, help="Max frames to extract (default: 60)")
+    p_analyze.add_argument("--max-frames", type=int, default=300, help="Max frames to extract (default: 300)")
     p_analyze.set_defaults(func=cmd_analyze)
 
     # transcribe command
@@ -564,7 +572,7 @@ def main():
     p_frames = subparsers.add_parser("frames", help="Extract video frames")
     add_common_args(p_frames)
     p_frames.add_argument("--frame-interval", type=int, default=30, help="Seconds between frames (default: 30)")
-    p_frames.add_argument("--max-frames", type=int, default=60)
+    p_frames.add_argument("--max-frames", type=int, default=300)
     p_frames.set_defaults(func=cmd_frames)
 
     # download command
