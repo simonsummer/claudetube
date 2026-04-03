@@ -1,0 +1,12 @@
+#!/bin/bash
+# Claudetube launcher - uses venv at ~/.claudetube/venv
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VENV="$HOME/.claudetube/venv"
+
+if [ ! -f "$VENV/bin/python" ]; then
+    echo "ERROR: venv not found at $VENV"
+    echo "Run: python3 -m venv $VENV && $VENV/bin/pip install yt-dlp openai-whisper"
+    exit 1
+fi
+
+exec "$VENV/bin/python" "$SCRIPT_DIR/claudetube.py" "$@"
