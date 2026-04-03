@@ -184,23 +184,95 @@ def parse_youtube_subs(sub_file: Path, start_sec: float = 0, end_sec: float = No
     return segments
 
 
+def split_audio(audio_path: Path, chunk_minutes: int = 10) -> List[Path]:
+    """Split audio into chunks for faster transcription."""
+    duration_cmd = [
+        "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)
+    ]
+    duration = float(run_cmd(duration_cmd).strip())
+    chunk_seconds = chunk_minutes * 60
+
+    if duration <= chunk_seconds * 1.5:
+        return [audio_path]
+
+    chunks = []
+    start = 0
+    i = 0
+    while start < duration:
+        chunk_path = audio_path.parent / f"chunk_{i:03d}.mp3"
+        cmd = [
+            "ffmpeg", "-y", "-i", str(audio_path),
+            "-ss", str(start), "-t", str(chunk_seconds),
+            "-c", "copy", str(chunk_path)
+        ]
+        run_cmd(cmd)
+        chunks.append(chunk_path)
+        start += chunk_seconds
+        i += 1
+
+    print(f"  Split audio into {len(chunks)} chunks of {chunk_minutes} min")
+    return chunks
+
+
 def transcribe_whisper(audio_path: Path, model_name: str = "base", language: str = None) -> List[Dict]:
-    """Transcribe audio using OpenAI Whisper."""
-    print(f"  Using Whisper ({model_name} model)...")
-    import whisper
-    model = whisper.load_model(model_name)
-    options = {}
-    if language:
-        options["language"] = language
-    result = model.transcribe(str(audio_path), **options)
-    segments = []
-    for seg in result.get("segments", []):
-        segments.append({
-            "start": round(seg["start"], 2),
-            "end": round(seg["end"], 2),
-            "text": seg["text"].strip(),
-        })
-    return segments
+    """Transcribe audio using mlx-whisper (Apple Silicon) with fallback to OpenAI Whisper."""
+    mlx_models = {
+        "tiny": "mlx-community/whisper-tiny-mlx",
+        "base": "mlx-community/whisper-base-mlx",
+        "small": "mlx-community/whisper-small-mlx",
+        "medium": "mlx-community/whisper-medium-mlx",
+        "large": "mlx-community/whisper-large-v3-mlx",
+    }
+
+    # Split long audio into chunks
+    chunks = split_audio(audio_path)
+
+    try:
+        import mlx_whisper
+        use_mlx = True
+        model_path = mlx_models.get(model_name, mlx_models["base"])
+        print(f"  Using mlx-whisper ({model_name} model, Apple Silicon accelerated)...")
+    except ImportError:
+        use_mlx = False
+        import whisper
+        print(f"  Using OpenAI Whisper ({model_name})...")
+        model = whisper.load_model(model_name)
+
+    all_segments = []
+    for ci, chunk_path in enumerate(chunks):
+        if len(chunks) > 1:
+            print(f"  Chunk {ci + 1}/{len(chunks)}...")
+
+        if use_mlx:
+            options = {"path_or_hf_repo": model_path}
+            if language:
+                options["language"] = language
+            result = mlx_whisper.transcribe(str(chunk_path), **options)
+        else:
+            options = {}
+            if language:
+                options["language"] = language
+            result = model.transcribe(str(chunk_path), **options)
+
+        # Calculate time offset for this chunk
+        offset = 0.0
+        if len(chunks) > 1 and ci > 0:
+            offset = ci * 10 * 60  # chunk_minutes = 10
+
+        for seg in result.get("segments", []):
+            all_segments.append({
+                "start": round(seg["start"] + offset, 2),
+                "end": round(seg["end"] + offset, 2),
+                "text": seg["text"].strip(),
+            })
+
+    # Clean up chunk files
+    for chunk_path in chunks:
+        if chunk_path != audio_path:
+            chunk_path.unlink(missing_ok=True)
+
+    return all_segments
 
 
 def create_transcript(
@@ -275,16 +347,16 @@ def extract_frames(
     frames_dir = output_dir / "frames"
     frames_dir.mkdir(exist_ok=True)
 
-    # Download video (low quality is fine for frame extraction)
+    # Download video (best quality for readable frames)
     video_path = output_dir / "video_tmp.mp4"
     cmd = [
         "yt-dlp",
-        "-f", "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst",
+        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "-o", str(video_path),
         "--no-playlist",
         url,
     ]
-    run_cmd(cmd, desc="Downloading video (low quality for frames)")
+    run_cmd(cmd, desc="Downloading video (best quality for frames)")
 
     # Build ffmpeg command for frame extraction
     ffmpeg_cmd = ["ffmpeg", "-y", "-i", str(video_path)]
@@ -295,8 +367,8 @@ def extract_frames(
 
     # Extract one frame every N seconds
     ffmpeg_cmd += [
-        "-vf", f"fps=1/{interval},scale=1280:-2",
-        "-qscale:v", "3",
+        "-vf", f"fps=1/{interval}",
+        "-qscale:v", "2",
         "-frames:v", str(max_frames),
         str(frames_dir / "frame_%04d.jpg"),
     ]
