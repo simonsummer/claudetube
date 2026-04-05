@@ -53,7 +53,7 @@ def _ensure_path():
         os.environ["PATH"] = homebrew + os.pathsep + os.environ.get("PATH", "")
 
 
-def run_cmd(cmd, desc="", timeout=600):
+def run_cmd(cmd, desc="", timeout=3600):
     """Run a shell command and return stdout. Raises on failure."""
     _ensure_path()
     if desc:
@@ -348,7 +348,7 @@ def extract_frames(
     interval: int = 30,
     start: str = None,
     end: str = None,
-    max_frames: int = 60,
+    max_frames: int = 600,
 ) -> List[Path]:
     """Extract frames from video at regular intervals using yt-dlp + ffmpeg."""
     print("[4/4] Extracting frames...")
@@ -558,7 +558,7 @@ def main():
     p_analyze.add_argument("--whisper-model", default="base", choices=["tiny", "base", "small", "medium", "large"])
     p_analyze.add_argument("--force-whisper", action="store_true", help="Skip YouTube subs, use Whisper")
     p_analyze.add_argument("--frame-interval", type=int, default=30, help="Seconds between frames (default: 30)")
-    p_analyze.add_argument("--max-frames", type=int, default=300, help="Max frames to extract (default: 300)")
+    p_analyze.add_argument("--max-frames", type=int, default=600, help="Max frames to extract (default: 600)")
     p_analyze.set_defaults(func=cmd_analyze)
 
     # transcribe command
@@ -572,7 +572,7 @@ def main():
     p_frames = subparsers.add_parser("frames", help="Extract video frames")
     add_common_args(p_frames)
     p_frames.add_argument("--frame-interval", type=int, default=30, help="Seconds between frames (default: 30)")
-    p_frames.add_argument("--max-frames", type=int, default=300)
+    p_frames.add_argument("--max-frames", type=int, default=600)
     p_frames.set_defaults(func=cmd_frames)
 
     # download command

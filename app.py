@@ -33,7 +33,7 @@ st.caption("YouTube Video Analyzer — Transkript + Frames für Claude-Analyse")
 with st.sidebar:
     st.header("Einstellungen")
     frame_interval = st.slider("Frame-Intervall (Sekunden)", 5, 300, 60)
-    max_frames = st.slider("Max. Frames", 5, 500, 200)
+    max_frames = st.slider("Max. Frames", 5, 1200, 600)
     whisper_model = st.selectbox("Whisper-Modell", ["tiny", "base", "small", "medium", "large"], index=1)
     force_whisper = st.checkbox("Whisper erzwingen (keine YT-Untertitel)")
     lang = st.text_input("Sprache (z.B. 'de', 'en')", value="")
