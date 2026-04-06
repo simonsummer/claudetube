@@ -440,16 +440,28 @@ def write_summary(output_dir: Path, meta: dict, frame_paths: List[Path]):
 # CLI Commands
 # ---------------------------------------------------------------------------
 
+def _resolve_language(args_lang: Optional[str], meta: dict) -> Optional[str]:
+    """Resolve language: explicit flag > YouTube metadata > None (auto-detect)."""
+    if args_lang:
+        return args_lang
+    yt_lang = meta.get("language")
+    if yt_lang:
+        print(f"  Auto-detected language from YouTube: {yt_lang}")
+        return yt_lang
+    return None
+
+
 def cmd_analyze(args):
     """Full analysis pipeline: metadata + transcript + frames."""
     output_dir = setup_output_dir(args.url, args.output_dir)
 
     meta = fetch_metadata(args.url, output_dir)
+    language = _resolve_language(args.lang, meta)
     audio_path = download_audio(args.url, output_dir, args.start, args.end)
     create_transcript(
         args.url, audio_path, output_dir,
         whisper_model=args.whisper_model,
-        language=args.lang,
+        language=language,
         start=args.start, end=args.end,
         force_whisper=args.force_whisper,
     )
@@ -476,11 +488,12 @@ def cmd_transcribe(args):
     """Transcribe only."""
     output_dir = setup_output_dir(args.url, args.output_dir)
     meta = fetch_metadata(args.url, output_dir)
+    language = _resolve_language(args.lang, meta)
     audio_path = download_audio(args.url, output_dir, args.start, args.end)
     create_transcript(
         args.url, audio_path, output_dir,
         whisper_model=args.whisper_model,
-        language=args.lang,
+        language=language,
         start=args.start, end=args.end,
         force_whisper=args.force_whisper,
     )

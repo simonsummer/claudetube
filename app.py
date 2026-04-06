@@ -76,6 +76,11 @@ if (do_analyze or do_transcribe or do_frames) and url:
             st.error(f"Fehler beim Laden der Video-Infos: {e}")
             st.stop()
 
+        # Auto-detect language from YouTube metadata if not set
+        if not language and meta.get("language"):
+            language = meta["language"]
+            st.write(f"Sprache auto-erkannt: **{language}**")
+
         st.write(f"**{meta['title']}**")
         st.write(f"Kanal: {meta['channel']} | Dauer: {meta['duration_string']} | Upload: {meta['upload_date']}")
         status.update(label="Video-Infos geladen", state="complete")
